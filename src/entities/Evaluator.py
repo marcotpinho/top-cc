@@ -10,17 +10,17 @@ from utils import calculate_rssi
 
 
 class Evaluator:
-    def __init__(self, map: Map = None, predict_distances: bool = False, save_to_db: bool = False):
+    def __init__(self, map: Map = None, predict_distances: bool = False, should_save_to_db: bool = False):
         self.map = map
         self.predict_distances = predict_distances
-        self.save_to_db = save_to_db
+        self.should_save_to_db = should_save_to_db
 
-    def evaluate(self, solutions: List[Solution] | Solution) -> List[tuple[float, float, float]]:
+    def evaluate(self, solutions: List[Solution] | Solution) -> None:
         if not isinstance(solutions, list):
             solutions = [solutions]
         if len(solutions) == 0:
-            return []
-        
+            return
+
         max_distances = []
         all_coordinates = []
         all_timestamps = []
@@ -56,17 +56,14 @@ class Evaluator:
         
         if self.predict_distances:
             max_distances = predict_max_distance_batch(all_coordinates, all_timestamps)
-        
-        final_results = []
-        for max_distance, result in zip(max_distances, solution_results):
+
+        for i, (max_distance, result) in enumerate(zip(max_distances, solution_results)):
             min_rssi = calculate_rssi(max_distance, noise=False)
             
-            if save_to_db and np.random.random() < 0.1:
+            if self.should_save_to_db and np.random.random() < 0.1:
                 save_to_db(result['paths'], speeds, self.map.rpositions, max_distance)
 
-            final_results.append((result['total_reward'], min_rssi, -result['max_len']))
-
-        return final_results
+            solutions[i].score = (result['total_reward'], min_rssi, -result['max_len'])
 
     def interpolate_positions(
         self,

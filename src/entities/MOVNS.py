@@ -30,7 +30,7 @@ class MOVNS:
         start_time = time.perf_counter()
 
         initial_solution = Solution(distmx=self.map.distmx, rvalues=self.map.rvalues)
-        initial_solution.score = self.evaluator.evaluate(initial_solution)
+        self.evaluator.evaluate(initial_solution)
         for neighborhood_id in tqdm(range(self.neighborhood.num_neighborhoods), desc="Initial local search", unit="neighborhood", dynamic_ncols=True):
             neighbors = local_search(
                 initial_solution,
@@ -53,17 +53,17 @@ class MOVNS:
                 perturbed_solution = perturb_solution(
                     solution,
                     self.neighborhood,
-                    neighborhood_id
                 )
                 neighbors = local_search(
                     perturbed_solution,
                     self.neighborhood,
                     neighborhood_id
                 )
+
                 new_solutions = [perturbed_solution] + neighbors
                 self.evaluator.evaluate(new_solutions)
 
-                self.archive, self.front, self.dominated = self.archive.update_archive([perturbed_solution] + neighbors)
+                self.archive.update_archive([perturbed_solution] + neighbors)
 
                 self.save_statistics()
 
