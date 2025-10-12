@@ -360,11 +360,11 @@ class Solution:
             score=copy.deepcopy(self.score),
         )
     
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         """
-        String representation of the solution.
+        Official string representation of the solution.
         
         Returns:
-            Formatted string showing score and paths
+            String showing score and paths
         """
-        return f"Solution: {self.score}\n {self.paths}"
+        return f"Solution(score={self.score}, paths={self.paths})"

@@ -225,7 +225,6 @@ def plot_animated_paths(
     speeds,
     directory=None,
     fname=None,
-    side_by_side=False,
     update_rewards=False,
 ):
     """
@@ -274,7 +273,7 @@ def plot_animated_paths(
     ax_legend = fig.add_subplot(gs[0, 1])
 
     fig.patch.set_facecolor(background_color)
-    ax1.set_facecolor("#ffcccc")
+    # ax1.set_facecolor("#ffcccc")
     ax2.set_facecolor(background_color)
     ax_legend.set_facecolor(background_color)
     plt.subplots_adjust(hspace=0.6, wspace=0.6)

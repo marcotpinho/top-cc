@@ -12,7 +12,5 @@ def perturb_solution(
 ) -> Solution:
     perturb_operator = neighborhood.get_perturbation_operator()
     new_solution = perturb_operator(solution)
-    new_solution.paths = new_solution.bound_all_paths(new_solution.paths, distmx, rvalues)
-    new_solution.score = evaluate(new_solution, rvalues, rpositions, distmx)
 
     return new_solution

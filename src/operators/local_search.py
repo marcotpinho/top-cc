@@ -16,9 +16,4 @@ def local_search(
     for agent in range(len(solution.paths)):
         local_search_operator = neighborhood.get_local_search_operator(neighborhood_id)
         neighbors.extend(local_search_operator(solution, agent))
-
-    for neighbor in neighbors:
-        neighbor.paths = neighbor.bound_all_paths(neighbor.paths, distmx, rvalues)
-        neighbor.score = evaluate(neighbor, rvalues, rpositions, distmx)
-            
     return neighbors

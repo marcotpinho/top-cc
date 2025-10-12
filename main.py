@@ -6,6 +6,54 @@ from typing import Tuple, List
 from src.movns import run_optimization
 
 
+def main() -> None:
+    """Main execution function."""
+    try:
+        args = parse_command_line_arguments()
+        
+        print(f"Loading problem instance from: {args.map}")
+        num_rewards, num_agents, default_budget, default_speeds, rpositions, rvalues = (
+            load_problem_instance(args.map)
+        )
+        
+        print(f"Problem instance: {num_agents} agents, {num_rewards} rewards")
+        
+        budget, speeds = validate_and_update_parameters(
+            args, num_agents, default_budget, default_speeds
+        )
+        
+        print(f"Agent configuration: speeds={speeds}, budget={budget}")
+        
+        # Extract map name for output organization
+        map_name = Path(args.map).stem
+        
+        print(f"Starting optimization with algorithm: {args.algorithm}")
+        paths = run_optimization(
+            rpositions=rpositions,
+            rvalues=rvalues,
+            budget=budget,
+            map_name=map_name,
+            output_dir=args.out,
+            total_time=args.total_time,
+            num_agents=num_agents,
+            speeds=speeds,
+            seed=args.seed,
+            max_iterations=args.num_iterations,
+            algorithm=args.algorithm,
+            save_results=not args.no_save,
+            plot_results=not args.no_plot,
+        )
+        
+        print(f"Optimization completed. Found {len(paths)} Pareto optimal solutions.")
+        
+    except (FileNotFoundError, ValueError) as e:
+        print(f"Error: {e}")
+    except KeyboardInterrupt:
+        print("\nOptimization interrupted by user.")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+
+
 def parse_command_line_arguments() -> argparse.Namespace:
     """
     Parse and validate command line arguments.
@@ -81,11 +129,28 @@ def parse_command_line_arguments() -> argparse.Namespace:
         action="store_true",
         help="Don't generate plots"
     )
+    parser.add_argument(
+        "--random_speeds", 
+        action="store_true",
+        help="Generate random speeds for agents"
+    )
+    parser.add_argument(
+        "--random_budget", 
+        action="store_true",
+        help="Generate random budgets for agents"
+    )
     
     return parser.parse_args()
 
 
-def load_problem_instance(map_file_path: str) -> Tuple[int, int, List[float], List[float], np.ndarray, np.ndarray]:
+def load_problem_instance(map_file_path: str) -> Tuple[
+    int,
+    int,
+    List[float],
+    List[float],
+    np.ndarray, # rpositions: shape (n, 2)
+    np.ndarray # rvalues: shape (n,)
+]:
     """
     Load problem instance from map file.
     
@@ -109,17 +174,17 @@ def load_problem_instance(map_file_path: str) -> Tuple[int, int, List[float], Li
             lines = f.readlines()
             
         # Parse header information
-        num_rewards = int(float(lines[0].split(sep=";")[1]))
-        num_agents = int(lines[1].split(sep=";")[1])
-        default_budget = float(lines[2].split(sep=";")[1])
+        num_rewards = int(float(lines[0].split()[1]))
+        num_agents = int(lines[1].split()[1])
+        default_budget = float(lines[2].split()[1])
         
         # Initialize default values
         budget = [default_budget] * num_agents
-        speeds = [1.0] * num_agents
+        default_speeds = [1.0] * num_agents
         
         reward_data = []
         for line in lines[3:]:
-            parts = line.strip().split(";")
+            parts = line.strip().split()
             if len(parts) >= 3:
                 x, y, value = float(parts[0]), float(parts[1]), float(parts[2])
                 reward_data.append([x, y, value])
@@ -131,7 +196,7 @@ def load_problem_instance(map_file_path: str) -> Tuple[int, int, List[float], Li
         rpositions = np.vstack([reward_array[1:, :2], reward_array[0:1, :2]])
         rvalues = np.concatenate([reward_array[1:, 2], reward_array[0:1, 2]])
         
-        return num_rewards, num_agents, budget, speeds, rpositions, rvalues
+        return num_rewards, num_agents, budget, default_speeds, rpositions, rvalues
         
     except (IndexError, ValueError) as e:
         raise ValueError(f"Invalid map file format: {e}")
@@ -166,67 +231,19 @@ def validate_and_update_parameters(
         if len(args.budget) != num_agents:
             raise ValueError(f"Budget count ({len(args.budget)}) must match number of agents ({num_agents})")
         budget = args.budget
-        
+    elif args.random_budget:
+        min_budget = default_budget[0]
+        budget = list(np.random.randint(min_budget, 2*min_budget, num_agents))
+
     if args.speeds is not None:
         if len(args.speeds) != num_agents:
             raise ValueError(f"Speed count ({len(args.speeds)}) must match number of agents ({num_agents})")
         speeds = args.speeds
-    
+    elif args.random_speeds:
+        min_speed = default_speeds[0]
+        speeds = list(np.random.uniform(min_speed, 3*min_speed, num_agents))
+
     return budget, speeds
-
-
-def main() -> None:
-    """Main execution function."""
-    try:
-        # Parse command line arguments
-        args = parse_command_line_arguments()
-        
-        # Load problem instance from map file
-        print(f"Loading problem instance from: {args.map}")
-        num_rewards, num_agents, default_budget, default_speeds, rpositions, rvalues = (
-            load_problem_instance(args.map)
-        )
-        
-        print(f"Problem instance: {num_agents} agents, {num_rewards} rewards")
-        
-        # Validate and update parameters
-        budget, speeds = validate_and_update_parameters(
-            args, num_agents, default_budget, default_speeds
-        )
-        
-        print(f"Agent configuration: speeds={speeds}, budget={budget}")
-        
-        # Extract map name for output organization
-        map_name = Path(args.map).stem
-        
-        print(f"Starting optimization with algorithm: {args.algorithm}")
-        paths = run_optimization(
-            rpositions=rpositions,
-            rvalues=rvalues,
-            budget=budget,
-            map_name=map_name,
-            output_dir=args.out,
-            total_time=args.total_time,
-            num_agents=num_agents,
-            speeds=speeds,
-            seed=args.seed,
-            max_iterations=args.num_iterations,
-            algorithm=args.algorithm,
-            save_results=not args.no_save,
-            plot_results=not args.no_plot,
-        )
-        
-        print(f"Optimization completed. Found {len(paths)} Pareto optimal solutions.")
-        
-    except (FileNotFoundError, ValueError) as e:
-        print(f"Error: {e}")
-        exit(1)
-    except KeyboardInterrupt:
-        print("\nOptimization interrupted by user.")
-        exit(1)
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        exit(1)
 
 
 if __name__ == "__main__":

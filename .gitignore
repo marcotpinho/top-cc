@@ -1,8 +1,6 @@
 *\__pycache__
 \__pycache__
 *\*.png
-\imgs
-\imgs\*
 .venv
 \out
 \out\*
@@ -14,5 +12,7 @@ test.py
 calc_dist_opt.py
 \benchmarks
 \benchmarks\*
+\checkpoints
 \data
 \data\*
+\maps

@@ -1,5 +1,5 @@
 from .Solution import Solution
+from .DistanceModel import DistanceModel
 from .Neighborhood import Neighborhood
-from .SanityAssertions import SanityAssertions
 
-__all__ = ["Solution", "Neighborhood", "SanityAssertions"]
+__all__ = ["Solution", "Neighborhood", "DistanceModel"]
