@@ -1,18 +1,18 @@
 import random
-import time
 import numpy as np
 import pickle
 from pathlib import Path
-from tqdm import tqdm
 from scipy.spatial.distance import cdist
 
 import plot
-from .evaluation import evaluate, update_archive
-from .operators import local_search, perturb_solution
-from .entities import Solution, Neighborhood
+from src.entities.Archive import Archive
+from src.entities.Evaluator import Evaluator
+from src.entities.MOVNS import MOVNS
+from src.entities.Map import Map
+from src.entities.Neighborhood import Neighborhood
+from src.entities.Solution import Solution
+from src.operators.local_search import local_search
 
-ARCHIVE_MAX_SIZE = 40
-FRONT_SELECTION_PROBABILITY = 0.9
 DEFAULT_OUTPUT_DIR = "imgs/"
 DEFAULT_PATHS_SUBDIR = "paths/"
 
@@ -112,136 +112,22 @@ def run_movns(
     np.random.seed(seed)
     random.seed(seed)
 
-    neighborhood = Neighborhood(algorithm)
-    
-    # Initialize with a random solution
-    front = []
-    log = []
+    mapp = Map(rvalues=rvalues, rpositions=rpositions, distmx=distmx)
+    neighborhood  = Neighborhood(algorithm)
+    archive = Archive()
+    evaluator = Evaluator(map=mapp)
+    movns = MOVNS(max_iterations=max_iterations,
+                  max_time=total_time,
+                  archive=archive,
+                  neighborhood=neighborhood,
+                  map=mapp,
+                  evaluator=evaluator)
 
-    archive, front, dominated = _initialize_archive(
-        initial_solution, neighborhood, archive, rvalues, rpositions, distmx
-    )
-    
-    save_statistics(log, front)
-
-    
-    archive, front, log = _run_main_optimization_loop(
-        archive, front, dominated, log, neighborhood, 
-        start_time, total_time, max_iterations, rvalues, rpositions, distmx
-    )
+    log, elapsed_time = movns.run()
 
     print(f"Finished running in {elapsed_time:.2f} seconds.")
 
-    return archive, front, log
-
-
-def save_statistics(log: list, front: list) -> None:
-    """
-    Save statistics of the current Pareto front.
-    
-    Args:
-        log: List to store statistics
-        front: Current Pareto front solutions
-    """
-    if not front:
-        return
-        
-    max_reward = max(solution.score[0] for solution in front)
-    max_rssi = max(solution.score[1] for solution in front)
-    log.append([max_reward, max_rssi])
-
-
-def select_solution_from_front(front: list, dominated: list, iteration: int) -> Solution:
-    """
-    Select a solution from the front or dominated set based on iteration strategy.
-    
-    Args:
-        front: Pareto front solutions
-        dominated: Dominated solutions
-        iteration: Current iteration number
-        
-    Returns:
-        Selected solution
-    """
-    # Decide whether to use front or dominated solutions
-    use_front = np.random.random() < FRONT_SELECTION_PROBABILITY or not dominated
-    candidates = _get_available_candidates(front if use_front else dominated)
-    
-    # Select based on iteration parity
-    if iteration % 2 == 0:
-        solution = _select_by_reward(candidates)
-    else:
-        solution = _select_by_rssi(candidates)
-    
-    solution.visited = True
-    return solution
-
-
-def _get_available_candidates(solutions: list) -> list:
-    """
-    Get unvisited solutions or reset all if none available.
-    
-    Args:
-        solutions: List of solutions to check
-        
-    Returns:
-        List of available candidate solutions
-    """
-    candidates = [s for s in solutions if not s.visited]
-    
-    if not candidates:
-        # Reset all solutions if no unvisited ones remain
-        for solution in solutions:
-            solution.visited = False
-        candidates = solutions
-        
-    return candidates
-
-
-def _select_by_reward(candidates: list[Solution]) -> Solution:
-    """Select solution probabilistically based on reward scores."""
-    rewards = np.array([s.score[0] for s in candidates])
-    if rewards.sum() == 0:
-        return random.choice(candidates)
-    probabilities = rewards / np.sum(rewards)
-    return np.random.choice(candidates, p=probabilities)
-
-
-def _select_by_rssi(candidates: list) -> Solution:
-    """Select solution probabilistically based on RSSI scores."""
-    rssi_scores = np.array([1 / s.score[1] for s in candidates])
-    probabilities = rssi_scores / np.sum(rssi_scores)
-    return np.random.choice(candidates, p=probabilities)
-
-
-def _initialize_archive(
-    solution: Solution, 
-    neighborhood: Neighborhood, 
-    archive: list,
-    rvalues: np.ndarray, # shape (n,)
-    rpositions: np.ndarray, # shape (n, 2)
-    distmx: np.ndarray # shape (n, n)
-) -> tuple[list, list, list]:
-    """Initialize the archive by exploring neighborhoods of the initial solution."""
-
-    
-    return archive, front, dominated
-
-
-def _run_main_optimization_loop(
-    archive: list, 
-    front: list, 
-    dominated: list, 
-    log: list,
-    neighborhood: Neighborhood,
-    start_time: float,
-    total_time: int,
-    max_iterations: int,
-    rvalues: np.ndarray, # shape (n,)
-    rpositions: np.ndarray, # shape (n, 2)
-    distmx: np.ndarray # shape (n, n)
-) -> tuple[list, list, list]:
-
+    return archive.front + archive.dominated, archive.front, log
 
 
 def save_results_to_files(

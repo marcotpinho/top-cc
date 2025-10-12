@@ -1,30 +1,14 @@
+import numpy as np
 from src.entities import Solution
-from src.operators.local_search import local_search
 
 ARCHIVE_MAX_SIZE = 40
+FRONT_SELECTION_PROBABILITY = 0.9
 
 class Archive:
-    def __init__(self, evaluator = None, neighborhood = None, map = None, max_size: int = ARCHIVE_MAX_SIZE):
+    def __init__(self, max_size: int = ARCHIVE_MAX_SIZE):
         self.front = []
         self.dominated = []
         self.max_size = max_size
-
-        self.evaluator = evaluator
-        self.neighborhood = neighborhood
-        self.map = map
-
-    def populate(self, initial_solution: Solution):
-        for neighborhood_id in range(self.neighborhood.num_neighborhoods):
-            neighbors = local_search(
-                initial_solution,
-                self.neighborhood,
-                neighborhood_id,
-                self.map.rvalues,
-                self.map.rpositions,
-                self.map.distmx
-            )
-            self.evaluator.evaluate(neighbors, self.map.rvalues, self.map.rpositions, self.map.distmx)
-            self.update_archive(neighbors)
 
     def update_archive(self, neighbors: list[Solution]) -> None:
         """Update archive with non-dominated solutions."""
@@ -79,7 +63,7 @@ class Archive:
 
     def _select_by_crowding_distance(self, solutions: list[Solution], k: int) -> list[Solution]:
         """Select solutions by crowding distance."""
-        self.assign_crowding_distance(solutions)
+        self._assign_crowding_distance(solutions)
         solutions.sort(key=lambda s: s.crowding_distance, reverse=True)
         return solutions[:k]
 
@@ -110,5 +94,43 @@ class Archive:
                 else:
                     solutions[j].crowding_distance += 0
 
-    def __repr__(self):
-        return f"Archive(front_size={len(self.front)}, dominated_size={len(self.dominated)})" 
+    def select_solution_to_optimize(self, iteration: int) -> Solution:
+        """Select a solution from the front or dominated set based on iteration strategy. """
+        # Decide whether to use front or dominated solutions
+        use_front = np.random.random() < FRONT_SELECTION_PROBABILITY or not self.dominated
+        candidates = self._get_available_candidates(self.front if use_front else self.dominated)
+
+        # Select based on iteration parity
+        if iteration % 2 == 0:
+            solution = self._select_by_reward(candidates)
+        else:
+            solution = self._select_by_rssi(candidates)
+
+        solution.visited = True
+        return solution
+
+    def _get_available_candidates(self, solutions: list) -> list:
+        """Get unvisited solutions or reset all if none available."""
+        candidates = [s for s in solutions if not s.visited]
+        
+        if not candidates:
+            # Reset all solutions if no unvisited ones remain
+            for solution in solutions:
+                solution.visited = False
+            candidates = solutions
+            
+        return candidates
+
+    def _select_by_reward(self, candidates: list[Solution]) -> Solution:
+        """Select solution probabilistically based on reward scores."""
+        rewards = np.array([s.score[0] for s in candidates])
+        if rewards.sum() == 0:
+            return np.random.choice(candidates)
+        probabilities = rewards / np.sum(rewards)
+        return np.random.choice(candidates, p=probabilities)
+
+    def _select_by_rssi(self, candidates: list[Solution]) -> Solution:
+        """Select solution probabilistically based on RSSI scores."""
+        rssi_scores = np.array([1 / s.score[1] for s in candidates])
+        probabilities = rssi_scores / np.sum(rssi_scores)
+        return np.random.choice(candidates, p=probabilities)

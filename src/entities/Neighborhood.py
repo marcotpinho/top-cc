@@ -2,7 +2,6 @@ from numba import njit
 import numpy as np
 
 from . import Solution
-from .SanityAssertions import SanityAssertions
 
 INVERSION_PROBABILITY = 0.75
 EPSILON = 1e-4

@@ -1,15 +1,11 @@
 import numpy as np
 from ..entities import Solution, Neighborhood
-from ..evaluation import evaluate
 
 
 def local_search(
     solution: Solution,
     neighborhood: Neighborhood,
     neighborhood_id: int,
-    rvalues: np.ndarray,
-    rpositions: np.ndarray,
-    distmx: np.ndarray,
 ) -> Solution:
     neighbors = []
 

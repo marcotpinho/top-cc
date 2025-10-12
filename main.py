@@ -48,10 +48,13 @@ def main() -> None:
         
     except (FileNotFoundError, ValueError) as e:
         print(f"Error: {e}")
+        exit(1)
     except KeyboardInterrupt:
         print("\nOptimization interrupted by user.")
+        exit(1)
     except Exception as e:
         print(f"Unexpected error: {e}")
+        exit(1)
 
 
 def parse_command_line_arguments() -> argparse.Namespace:
