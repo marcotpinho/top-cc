@@ -1,17 +1,15 @@
 import numpy as np
+from src.config import CONFIG
 from src.entities import Solution
 
-ARCHIVE_MAX_SIZE = 40
-FRONT_SELECTION_PROBABILITY = 0.9
 
 class Archive:
-    def __init__(self, max_size: int = ARCHIVE_MAX_SIZE):
+    def __init__(self, max_size: int = CONFIG.archive_size):
         self.front = []
         self.dominated = []
         self.max_size = max_size
 
     def update_archive(self, neighbors: list[Solution]) -> None:
-        """Update archive with non-dominated solutions."""
         all_solutions = self.front + self.dominated + neighbors
 
         self.front, all_dominated = self._get_non_dominated_solutions(all_solutions)
@@ -24,13 +22,11 @@ class Archive:
             self.dominated = self._select_by_crowding_distance(all_dominated, min(self.max_size - len(self.front), len(all_dominated)))
 
     def _get_non_dominated_solutions(self, solutions: list[Solution]) -> tuple[list[Solution], list[Solution]]:
-        """Get non-dominated solutions using NSGA-II style sorting."""
         if len(solutions) <= 1:
             return solutions, []
         return self._fast_non_dominated_sort(solutions)
 
     def _fast_non_dominated_sort(self, solutions: list[Solution]) -> tuple[list[Solution], list[Solution]]:
-        """Fast non-dominated sorting algorithm."""
         n = len(solutions)
         if n <= 1:
             return solutions, []
@@ -62,13 +58,11 @@ class Archive:
         return non_dominated, dominated
 
     def _select_by_crowding_distance(self, solutions: list[Solution], k: int) -> list[Solution]:
-        """Select solutions by crowding distance."""
         self._assign_crowding_distance(solutions)
         solutions.sort(key=lambda s: s.crowding_distance, reverse=True)
         return solutions[:k]
 
     def _assign_crowding_distance(self, solutions: list[Solution]) -> None:
-        """Assign crowding distance to solutions."""
         num_solutions = len(solutions)
         if num_solutions == 0:
             return
@@ -95,9 +89,8 @@ class Archive:
                     solutions[j].crowding_distance += 0
 
     def select_solution_to_optimize(self, iteration: int) -> Solution:
-        """Select a solution from the front or dominated set based on iteration strategy. """
         # Decide whether to use front or dominated solutions
-        use_front = np.random.random() < FRONT_SELECTION_PROBABILITY or not self.dominated
+        use_front = np.random.random() < CONFIG.front_selection_prob or not self.dominated
         candidates = self._get_available_candidates(self.front if use_front else self.dominated)
 
         # Select based on iteration parity
@@ -110,7 +103,6 @@ class Archive:
         return solution
 
     def _get_available_candidates(self, solutions: list) -> list:
-        """Get unvisited solutions or reset all if none available."""
         candidates = [s for s in solutions if not s.visited]
         
         if not candidates:
@@ -122,7 +114,6 @@ class Archive:
         return candidates
 
     def _select_by_reward(self, candidates: list[Solution]) -> Solution:
-        """Select solution probabilistically based on reward scores."""
         rewards = np.array([s.score[0] for s in candidates])
         if rewards.sum() == 0:
             return np.random.choice(candidates)
@@ -130,7 +121,6 @@ class Archive:
         return np.random.choice(candidates, p=probabilities)
 
     def _select_by_rssi(self, candidates: list[Solution]) -> Solution:
-        """Select solution probabilistically based on RSSI scores."""
         rssi_scores = np.array([1 / s.score[1] for s in candidates])
         probabilities = rssi_scores / np.sum(rssi_scores)
         return np.random.choice(candidates, p=probabilities)

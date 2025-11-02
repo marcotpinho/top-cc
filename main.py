@@ -3,29 +3,36 @@ import numpy as np
 from pathlib import Path
 from typing import Tuple, List
 
+from src.config import CONFIG
 from src.movns import run_optimization
 
 
 def main() -> None:
-    """Main execution function."""
     try:
         args = parse_command_line_arguments()
         
         print(f"Loading problem instance from: {args.map}")
-        num_rewards, num_agents, default_budget, default_speeds, rpositions, rvalues = (
-            load_problem_instance(args.map)
-        )
+        num_rewards, num_agents, default_budget, default_speeds, rpositions, rvalues = load_problem_instance(args.map)
         
         print(f"Problem instance: {num_agents} agents, {num_rewards} rewards")
         
-        budget, speeds = validate_and_update_parameters(
-            args, num_agents, default_budget, default_speeds
-        )
-        
-        print(f"Agent configuration: speeds={speeds}, budget={budget}")
+        budget, speeds = validate_and_update_parameters(args, num_agents, default_budget, default_speeds)
         
         # Extract map name for output organization
         map_name = Path(args.map).stem
+        
+        CONFIG.seed = args.seed
+        CONFIG.max_iterations = args.num_iterations
+        CONFIG.max_time = args.max_time
+        CONFIG.algorithm = args.algorithm
+        CONFIG.save_results = not args.no_save
+        CONFIG.plot_results = not args.no_plot
+        CONFIG.save_to_db = args.save_to_db
+        CONFIG.predict_distances = args.predict_distances
+        CONFIG.map_file = args.map
+        CONFIG.db_path = f"data/{map_name}_distances_train.json"
+
+        print(f"Configurations: {CONFIG}")
         
         print(f"Starting optimization with algorithm: {args.algorithm}")
         paths = run_optimization(
@@ -33,15 +40,8 @@ def main() -> None:
             rvalues=rvalues,
             budget=budget,
             map_name=map_name,
-            output_dir=args.out,
-            total_time=args.total_time,
             num_agents=num_agents,
             speeds=speeds,
-            seed=args.seed,
-            max_iterations=args.num_iterations,
-            algorithm=args.algorithm,
-            save_results=not args.no_save,
-            plot_results=not args.no_plot,
         )
         
         print(f"Optimization completed. Found {len(paths)} Pareto optimal solutions.")
@@ -58,17 +58,10 @@ def main() -> None:
 
 
 def parse_command_line_arguments() -> argparse.Namespace:
-    """
-    Parse and validate command line arguments.
-    
-    Returns:
-        Parsed command line arguments
-    """
     parser = argparse.ArgumentParser(
         description="Run multi-objective optimization for multi-agent routing",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    
     parser.add_argument(
         "--map", 
         type=str, 
@@ -81,7 +74,6 @@ def parse_command_line_arguments() -> argparse.Namespace:
         default="out/",
         help="Output directory for results"
     )
-    
     parser.add_argument(
         "--algorithm", 
         type=str, 
@@ -95,9 +87,8 @@ def parse_command_line_arguments() -> argparse.Namespace:
         default=42,
         help="Random seed for reproducibility"
     )
-    
     parser.add_argument(
-        "--total_time", 
+        "--max_time", 
         type=int, 
         default=540,
         help="Maximum execution time in seconds"
@@ -108,7 +99,6 @@ def parse_command_line_arguments() -> argparse.Namespace:
         default=100,
         help="Maximum number of iterations"
     )
-    
     parser.add_argument(
         "--speeds", 
         type=float, 
@@ -121,7 +111,6 @@ def parse_command_line_arguments() -> argparse.Namespace:
         nargs="+",
         help="Budget values for agents (overrides map file)"
     )
-    
     parser.add_argument(
         "--no_save", 
         action="store_true",
@@ -142,7 +131,17 @@ def parse_command_line_arguments() -> argparse.Namespace:
         action="store_true",
         help="Generate random budgets for agents"
     )
-    
+    parser.add_argument(
+        "--save_to_db", 
+        action="store_true",
+        help="Save some evaluations to the database"
+    )
+    parser.add_argument(
+        "--predict_distances",
+        action="store_true",
+        help="Predict distances using the model"
+    )
+
     return parser.parse_args()
 
 
@@ -154,19 +153,6 @@ def load_problem_instance(map_file_path: str) -> Tuple[
     np.ndarray, # rpositions: shape (n, 2)
     np.ndarray # rvalues: shape (n,)
 ]:
-    """
-    Load problem instance from map file.
-    
-    Args:
-        map_file_path: Path to the map file
-        
-    Returns:
-        Tuple of (num_rewards, num_agents, budget, speeds, rpositions, rvalues)
-        
-    Raises:
-        FileNotFoundError: If map file doesn't exist
-        ValueError: If map file format is invalid
-    """
     map_path = Path(map_file_path)
     
     if not map_path.exists():
@@ -211,21 +197,6 @@ def validate_and_update_parameters(
     default_budget: List[float],
     default_speeds: List[float]
 ) -> Tuple[List[float], List[float]]:
-    """
-    Validate and update agent parameters from command line arguments.
-    
-    Args:
-        args: Command line arguments
-        num_agents: Number of agents from map file
-        default_budget: Default budget values
-        default_speeds: Default speed values
-        
-    Returns:
-        Tuple of (budget, speeds)
-        
-    Raises:
-        ValueError: If parameter counts don't match number of agents
-    """
     budget = default_budget.copy()
     speeds = default_speeds.copy()
     

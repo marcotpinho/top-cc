@@ -2,7 +2,7 @@ import numpy as np
 from numba import njit
 from typing import List
 
-from db_utils import save_to_db
+from src.db_utils import save_to_db
 from src.dist_func_batch import predict_max_distance_batch
 from src.entities.Map import Map
 from src.entities.Solution import Solution
@@ -55,12 +55,12 @@ class Evaluator:
             })
         
         if self.predict_distances:
-            max_distances = predict_max_distance_batch(all_coordinates, all_timestamps)
+            max_distances = predict_max_distance_batch(all_coordinates, all_timestamps, self.map)
 
         for i, (max_distance, result) in enumerate(zip(max_distances, solution_results)):
             min_rssi = calculate_rssi(max_distance, noise=False)
             
-            if self.should_save_to_db and np.random.random() < 0.1:
+            if self.should_save_to_db and np.random.random() < 0.05:
                 save_to_db(result['paths'], speeds, self.map.rpositions, max_distance)
 
             solutions[i].score = (result['total_reward'], min_rssi, -result['max_len'])
@@ -71,7 +71,6 @@ class Evaluator:
         speeds: np.ndarray, # shape (k,)
         interesting_times: np.ndarray
     ) -> np.ndarray:
-        """Interpolate agent positions at interesting time points."""
         num_paths = len(paths)
         num_times = len(interesting_times)
         interpolated_positions = np.zeros((num_paths, num_times, 2))
@@ -106,7 +105,6 @@ class Evaluator:
 
 @njit(cache=True, fastmath=True)
 def get_paths_max_length(paths_array: np.ndarray, distmx: np.ndarray) -> float:
-    """Numba-optimized version for array input."""
     max_distance = 0.0
     
     for i in range(len(paths_array)):
@@ -126,7 +124,6 @@ def get_time_to_rewards(
     speeds: np.ndarray, # shape (k,)
     distmx: np.ndarray # shape (n, n)
 ) -> tuple[np.ndarray, list[list[float]]]:
-    """Calculate timestamps for reward collection along paths."""
     all_times = []
     timestamps = []
     
@@ -153,7 +150,6 @@ def get_time_to_rewards(
 
 @njit(cache=True, fastmath=True)
 def calculate_max_distance(interpolated_positions: np.ndarray) -> float:
-    """Calculate maximum distance between any two agents at any time."""
     if len(interpolated_positions) <= 1:
         return 0.0
     
@@ -174,7 +170,6 @@ def calculate_max_distance(interpolated_positions: np.ndarray) -> float:
 
 @njit(cache=True, fastmath=True)
 def maximize_reward(paths_flat: np.ndarray, rvalues: np.ndarray) -> float:
-    """Calculate total reward from unique visited nodes."""
     unique_elements = np.unique(paths_flat)
     reward = 0.0
     for element in unique_elements:

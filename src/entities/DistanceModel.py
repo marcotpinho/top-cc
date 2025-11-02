@@ -15,7 +15,7 @@ class PathEncoder(nn.Module):
 
 
 class InteractionModule(nn.Module):
-    def __init__(self, hidden_dim=64, nhead=4, nlayers=3):
+    def __init__(self, hidden_dim=64, nhead=4, nlayers=2):
         super().__init__()
         encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_dim, nhead=nhead, batch_first=True)
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=nlayers)

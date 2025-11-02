@@ -9,7 +9,7 @@ from src.entities.Solution import Solution
 from src.operators import local_search
 from src.operators.perturb_solution import perturb_solution
 
-class MOVNS:
+class Runner:
     def __init__(self,
                  max_time: float,
                  max_iterations: int,
@@ -26,7 +26,6 @@ class MOVNS:
         self.log = []
 
     def run(self):
-        """Run the main optimization loop."""
         start_time = time.perf_counter()
 
         initial_solution = Solution(distmx=self.map.distmx, rvalues=self.map.rvalues)
@@ -76,7 +75,6 @@ class MOVNS:
         return self.log, elapsed_time
 
     def save_statistics(self) -> None:
-        """Save statistics of the current Pareto front."""
         if not self.archive.front:
             return
 
